@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import os
 import re
+import json
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -58,7 +59,15 @@ def main():
             st.session_state.name = name    
             st.session_state.main_vertical = main_vertical
             st.session_state.sub_vertical = sub_vertical
+            # Call Brandfetch API
             fetch_brand_data(company_url)
+            # Call Raven Agent API with spinner for long wait
+            with st.spinner("Contacting Raven Agent (may take up to 1 minute)..."):
+                questions = call_raven_agent(company_url)
+            st.session_state.raven_questions = questions
+            # Comment out rerun for debugging
+            st.session_state.page = 'select_brand'
+            st.rerun()  # Re-enable rerun to show the next page after questions are fetched
     elif st.session_state.page == 'select_brand':
         show_brand_options(st.session_state.brand_data)
     elif st.session_state.page == 'final':
@@ -69,6 +78,7 @@ def generate_branded_app(logo_url, color_hex, name):
     template_path = os.path.join(script_dir, "brand_landing_app_template.py")
     
     safe_name = re.sub(r'[^\w\-]', '_', name.lower().strip())
+    safe_name = re.sub(r'_+', '_', safe_name).strip('_') or 'brand'
     output_filename = f"brand_landing_app_{safe_name}.py"
     output_path = os.path.join(script_dir, output_filename)
     
@@ -86,7 +96,21 @@ def generate_branded_app(logo_url, color_hex, name):
         f'selected_color = "{color_hex}"',
         modified_content
     )
-    
+
+    # Embed Top 5 Discovery Questions as static content in sidebar if available
+    questions = st.session_state.get('raven_questions', [])
+    questions_code = ''
+    if questions:
+        questions_code = '\nwith st.sidebar:\n    st.markdown("""<h3 style=\"color: #29b5e8; margin-top: 0;\">Top 5 Discovery Questions</h3>""", unsafe_allow_html=True)\n    with st.expander("Show/Hide Questions", expanded=False):\n        st.markdown("<ol>", unsafe_allow_html=True)\n'
+        for q in questions:
+            questions_code += f'        st.markdown("<li style=\\"margin-bottom: 0.75rem; font-size: 1.08rem;\\">{q}</li>", unsafe_allow_html=True)\n'
+        questions_code += '        st.markdown("</ol>", unsafe_allow_html=True)\n'
+    # Insert the questions code after the logo/color setup
+    insert_point = 'st.markdown(f"""\n  <style>'
+    if insert_point in modified_content:
+        modified_content = modified_content.replace(insert_point, questions_code + '\n' + insert_point)
+    else:
+        modified_content = questions_code + '\n' + modified_content
     # Write the new file
     with open(output_path, 'w') as f:
         f.write(modified_content)
@@ -104,33 +128,113 @@ def fetch_brand_data(company_url):
         if response.status_code == 200:
             data = response.json()
             st.session_state.brand_data = data
-            st.session_state.page = 'select_brand'
-            st.rerun()
         else:
             st.error(f"Failed to fetch brand data. Status code: {response.status_code}")
 
 def show_brand_options(data):
     logos = data.get("logos", [])[:3]
     colors = data.get("colors", [])[:3]
-    st.subheader("Select a Logo")
-    logo_urls = [logo.get("formats", [{}])[0].get("src", "") for logo in logos]
-    selected_logo = st.radio("Choose a logo:", logo_urls, format_func=lambda x: x, key="logo_radio")
-    for url in logo_urls:
-        st.image(url, width=100)
-    st.subheader("Select a Color")
-    color_hexes = [color.get("hex", "#000000") for color in colors]
-    selected_color = st.radio("Choose a color:", color_hexes, key="color_radio")
-    for hex_code in color_hexes:
-        st.markdown(f'<div style="width:50px;height:25px;background:{hex_code};display:inline-block;margin-right:10px;"></div>', unsafe_allow_html=True)
-    if st.button("Finalize Selection"):
-        st.session_state.selected_logo = selected_logo
-        st.session_state.selected_color = selected_color
-        
-        generated_file = generate_branded_app(selected_logo, selected_color, st.session_state.name)
-        st.session_state.generated_file = generated_file
-        
-        st.session_state.page = 'final'
-        st.rerun()
+    # Layout: left column for Raven questions, right for logo/color selection
+    col1, col2 = st.columns([1,2])
+    with col1:
+        st.subheader("Top 5 Discovery Questions")
+        questions = st.session_state.get("raven_questions", [])
+        if questions:
+            for i, q in enumerate(questions, 1):
+                st.markdown(f"**{i}.** {q}")
+        else:
+            st.info("Questions will appear here after submission.")
+    with col2:
+        st.subheader("Select a Logo")
+        logo_urls = [logo.get("formats", [{}])[0].get("src", "") for logo in logos]
+        selected_logo = st.radio("Choose a logo:", logo_urls, format_func=lambda x: x, key="logo_radio")
+        for url in logo_urls:
+            st.image(url, width=100)
+        st.subheader("Select a Color")
+        color_hexes = [color.get("hex", "#000000") for color in colors]
+        selected_color = st.radio("Choose a color:", color_hexes, key="color_radio")
+        for hex_code in color_hexes:
+            st.markdown(f'<div style="width:50px;height:25px;background:{hex_code};display:inline-block;margin-right:10px;"></div>', unsafe_allow_html=True)
+        if st.button("Finalize Selection"):
+            st.session_state.selected_logo = selected_logo
+            st.session_state.selected_color = selected_color
+            generated_file = generate_branded_app(selected_logo, selected_color, st.session_state.name)
+            st.session_state.generated_file = generated_file
+            st.session_state.page = 'final'
+            st.rerun()
+def call_raven_agent(company_url):
+    """
+    Calls the Raven Sales Assistant Agent API and returns the top 5 questions as a list.
+    Handles streaming (SSE or chunked) responses and extracts only the final questions block.
+    """
+    API_ENDPOINT = "https://SFCOGSOPS-SNOWHOUSE_AWS_US_WEST_2.snowflakecomputing.com/api/v2/databases/SNOWFLAKE_INTELLIGENCE/schemas/AGENTS/agents/RAVEN_SALES_ASSISTANT:run"
+    SNOWHOUSE_BEARER_TOKEN = os.getenv("SNOWHOUSE_AUTH_TOKEN")
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Authorization": f"Bearer {SNOWHOUSE_BEARER_TOKEN}"
+    }
+    payload = {
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"Please review the company  {company_url} and identify their main industry, goal, and any recent major news. With this company profile, review and determine the most important Snowflake intelligence use case for that company. Return one list of the top 5 questions typical of that use case. Do not return anything besides those top questions. Always start your response with 'Here are your questions:'"
+                    }
+                ]
+            }
+        ],
+        "tool_choice": {
+            "type": "auto",
+            "name": []
+        }
+    }
+    try:
+        response = requests.post(
+            API_ENDPOINT,
+            headers=headers,
+            data=json.dumps(payload),
+            timeout=60,
+            verify=False,
+            stream=True
+        )
+        if response.status_code != 200:
+            st.error(f"Raven Agent API error: {response.status_code}\nResponse: {response.text}")
+            return [f"API error: {response.status_code}"]
+        # Process streaming response, only collect from 'event: response.text' lines
+        questions_text = ""
+        for line in response.iter_lines(decode_unicode=True):
+            if not line:
+                continue
+            if line.startswith('event:'):
+                current_event = line.split(':', 1)[1].strip()
+                continue
+            if line.startswith('data:') and 'current_event' in locals() and current_event == 'response.text':
+                data_str = line[5:].strip()
+                try:
+                    data_json = json.loads(data_str)
+                    questions_text += data_json.get('text', '') + "\n"
+                except Exception:
+                    continue
+        # Now extract questions from questions_text
+        questions = []
+        if questions_text:
+            matches = re.findall(r"\d+\.\s+\*\*(.*?)\*\*", questions_text)
+            if not matches:
+                # fallback: try to extract numbered lines
+                matches = re.findall(r"\d+\.\s+(.*?)\n", questions_text)
+            for q in matches:
+                if q.strip():
+                    questions.append(q.strip())
+        if not questions:
+            st.error("No valid questions found in streaming response.")
+            return ["No questions found in response."]
+        return questions[:5]
+    except Exception as e:
+        st.error(f"Error calling Raven Agent: {str(e)}")
+        return [f"Error calling Raven Agent: {str(e)}"]
 
 def show_final_page(logo_url, color_hex, generated_file):
     st.markdown(f'<div style="background:{color_hex};padding:30px;text-align:center;">', unsafe_allow_html=True)

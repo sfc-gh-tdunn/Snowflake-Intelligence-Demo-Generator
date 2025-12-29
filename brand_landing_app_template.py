@@ -3,6 +3,7 @@ import streamlit.components.v1 as components
 import requests
 import json
 import urllib3
+import os
 from typing import Generator
 from dotenv import load_dotenv
 
@@ -264,6 +265,16 @@ st.markdown(f"""
 # Initialize chat history
 if 'chat_history' not in st.session_state:
     st.session_state.chat_history = []
+
+# Insert Top 5 Discovery Questions if available in session state
+questions = st.session_state.get('raven_questions', [])
+if questions:
+    st.markdown('''<div style="background: #f7fafd; border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem; border: 1px solid #e0eaf3;">
+    <h3 style="color: #29b5e8; margin-top: 0;">Top 5 Discovery Questions</h3>
+    <ol>''', unsafe_allow_html=True)
+    for q in questions:
+        st.markdown(f'<li style="margin-bottom: 0.75rem; font-size: 1.08rem;">{q}</li>', unsafe_allow_html=True)
+    st.markdown('</ol></div>', unsafe_allow_html=True)
 
 # Show greeting only if no chat history
 if not st.session_state.chat_history:

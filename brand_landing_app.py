@@ -3,6 +3,7 @@ import streamlit.components.v1 as components
 import requests
 import json
 import urllib3
+import os
 from typing import Generator
 from dotenv import load_dotenv
 
