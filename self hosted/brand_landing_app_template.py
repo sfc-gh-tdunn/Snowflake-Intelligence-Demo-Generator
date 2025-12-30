@@ -338,60 +338,36 @@ if not st.session_state.chat_history:
 
 # Display chat history
 for message in st.session_state.chat_history:
-    role = message["role"]
-    content = message["content"]
-    if role == "user":
-        st.markdown(f'''<div style="background-color: #2d3748; border-radius: 12px; padding: 1rem; margin-bottom: 0.5rem;">
-            <p style="color: #ffffff; margin: 0;"><strong>You:</strong> {content}</p>
-        </div>''', unsafe_allow_html=True)
-    else:
-        st.markdown(f'''<div style="background-color: #4a5568; border-radius: 12px; padding: 1rem; margin-bottom: 0.5rem;">
-            <p style="color: #ffffff; margin: 0;"><strong>Assistant:</strong></p>
-            <div style="color: #ffffff;">{content}</div>
-        </div>''', unsafe_allow_html=True)
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-# Chat input using text_input (compatible with older Streamlit versions)
-with st.form(key="chat_form", clear_on_submit=True):
-    prompt = st.text_input("Ask Snowflake Intelligence...", key="user_input", label_visibility="collapsed")
-    submit_button = st.form_submit_button("Send")
-
-if submit_button and prompt:
+# Chat input
+if prompt := st.chat_input("Ask Snowflake Intelligence..."):
     # Add user message to history
     st.session_state.chat_history.append({"role": "user", "content": prompt})
     
     # Display user message
-    st.markdown(f'''<div style="background-color: #2d3748; border-radius: 12px; padding: 1rem; margin-bottom: 0.5rem;">
-        <p style="color: #ffffff; margin: 0;"><strong>You:</strong> {prompt}</p>
-    </div>''', unsafe_allow_html=True)
+    with st.chat_message("user"):
+        st.markdown(prompt)
     
     # Display assistant response with streaming
-    response_container = st.empty()
-    full_response = ""
-    
-    try:
-        # Stream the response
-        for chunk in call_streaming_api(prompt, st.session_state.chat_history):
-            full_response += chunk
-            response_container.markdown(f'''<div style="background-color: #4a5568; border-radius: 12px; padding: 1rem; margin-bottom: 0.5rem;">
-                <p style="color: #ffffff; margin: 0;"><strong>Assistant:</strong></p>
-                <div style="color: #ffffff;">{full_response}▌</div>
-            </div>''', unsafe_allow_html=True)
+    with st.chat_message("assistant"):
+        response_placeholder = st.empty()
+        full_response = ""
         
-        # Final response without cursor
-        response_container.markdown(f'''<div style="background-color: #4a5568; border-radius: 12px; padding: 1rem; margin-bottom: 0.5rem;">
-            <p style="color: #ffffff; margin: 0;"><strong>Assistant:</strong></p>
-            <div style="color: #ffffff;">{full_response}</div>
-        </div>''', unsafe_allow_html=True)
+        try:
+            # Stream the response
+            for chunk in call_streaming_api(prompt, st.session_state.chat_history):
+                full_response += chunk
+                response_placeholder.markdown(full_response + "▌")
+            
+            # Final response without cursor
+            response_placeholder.markdown(full_response)
+            
+        except Exception as e:
+            error_msg = f"Error calling API: {str(e)}"
+            response_placeholder.markdown(error_msg)
+            full_response = error_msg
         
-    except Exception as e:
-        error_msg = f"Error calling API: {str(e)}"
-        response_container.markdown(f'''<div style="background-color: #dc3545; border-radius: 12px; padding: 1rem; margin-bottom: 0.5rem;">
-            <p style="color: #ffffff; margin: 0;">{error_msg}</p>
-        </div>''', unsafe_allow_html=True)
-        full_response = error_msg
-    
-    # Add assistant response to history
-    st.session_state.chat_history.append({"role": "assistant", "content": full_response})
-    
-    # Rerun to update the chat display
-    st.experimental_rerun()
+        # Add assistant response to history
+        st.session_state.chat_history.append({"role": "assistant", "content": full_response})

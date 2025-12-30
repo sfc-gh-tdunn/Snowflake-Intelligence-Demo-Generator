@@ -3,23 +3,11 @@ import requests
 import os
 import re
 import json
-import tempfile
-
-from dotenv import load_dotenv  # python-dotenv package
+from dotenv import load_dotenv
 
 load_dotenv()
 
-# Try to get Snowflake session for SiS environment
-try:
-    from snowflake.snowpark.context import get_active_session
-    session = get_active_session()
-    IN_SNOWFLAKE = True
-except Exception:
-    session = None
-    IN_SNOWFLAKE = False
-
 BRANDFETCH_BEARER_TOKEN = os.getenv("BRANDFETCH_TOKEN")
-SNOWFLAKE_STAGE = "@DEMO_GENERATOR.DATA.STREAMLIT_OUTPUT"
 
 st.set_page_config(
     page_title="Snowflake Intelligence Demo Generator",
@@ -83,7 +71,7 @@ def main():
             st.session_state.raven_questions = questions
             # Comment out rerun for debugging
             st.session_state.page = 'select_brand'
-            st.experimental_rerun()  # Re-enable rerun to show the next page after questions are fetched
+            st.rerun()  # Re-enable rerun to show the next page after questions are fetched
     elif st.session_state.page == 'select_brand':
         show_brand_options(st.session_state.brand_data)
     elif st.session_state.page == 'final':
@@ -96,8 +84,8 @@ def generate_branded_app(logo_url, color_hex, name):
     safe_name = re.sub(r'[^\w\-]', '_', name.lower().strip())
     safe_name = re.sub(r'_+', '_', safe_name).strip('_') or 'brand'
     output_filename = f"brand_landing_app_{safe_name}.py"
+    output_path = os.path.join(script_dir, output_filename)
     
-    # Read template file
     with open(template_path, 'r') as f:
         template_content = f.read()
     
@@ -216,45 +204,11 @@ def generate_branded_app(logo_url, color_hex, name):
         modified_content = modified_content.replace(insert_point, questions_code + '\n' + insert_point)
     else:
         modified_content = questions_code + '\n' + modified_content
+    # Write the new file
+    with open(output_path, 'w') as f:
+        f.write(modified_content)
     
-    # Write the file to Snowflake stage or local filesystem
-    if IN_SNOWFLAKE and session:
-        # Write to Snowflake internal stage
-        # Create temp directory and write file with the correct filename
-        tmp_dir = tempfile.mkdtemp()
-        tmp_file_path = os.path.join(tmp_dir, output_filename)
-        
-        with open(tmp_file_path, 'w') as tmp_file:
-            tmp_file.write(modified_content)
-        
-        try:
-            # PUT the file to the Snowflake stage
-            put_result = session.file.put(
-                tmp_file_path,
-                SNOWFLAKE_STAGE,
-                auto_compress=False,
-                overwrite=True
-            )
-            # Clean up temp file and directory
-            os.unlink(tmp_file_path)
-            os.rmdir(tmp_dir)
-            
-            stage_path = f"{SNOWFLAKE_STAGE}/{output_filename}"
-            return stage_path
-        except Exception as e:
-            # Clean up temp file on error
-            if os.path.exists(tmp_file_path):
-                os.unlink(tmp_file_path)
-            if os.path.exists(tmp_dir):
-                os.rmdir(tmp_dir)
-            st.error(f"Error writing to stage: {str(e)}")
-            return None
-    else:
-        # Local filesystem fallback
-        output_path = os.path.join(script_dir, output_filename)
-        with open(output_path, 'w') as f:
-            f.write(modified_content)
-        return output_path
+    return output_path
 
 
 def fetch_brand_data(company_url):
@@ -300,7 +254,7 @@ def show_brand_options(data):
             generated_file = generate_branded_app(selected_logo, selected_color, st.session_state.name)
             st.session_state.generated_file = generated_file
             st.session_state.page = 'final'
-            st.experimental_rerun()
+            st.rerun()
 def call_raven_agent(company_url):
     """
     Calls the Raven Sales Assistant Agent API and returns the top 5 questions as a list.
@@ -383,24 +337,15 @@ def show_final_page(logo_url, color_hex, generated_file):
     st.success("Your branded landing page has been generated!")
     
     if generated_file:
-        # Extract filename from path (works for both local and stage paths)
-        if generated_file.startswith("@"):
-            # Snowflake stage path
-            filename = generated_file.split("/")[-1]
-            st.write(f"**Generated file:** `{filename}`")
-            st.write(f"**Stage location:** `{generated_file}`")
-            st.info(f"To download this file, run: `GET {generated_file} file://<local_path>/`")
-        else:
-            # Local filesystem path
-            st.write(f"**Generated file:** `{os.path.basename(generated_file)}`")
-            st.write(f"**Full path:** `{generated_file}`")
-            st.info("You can run this file with: `streamlit run " + os.path.basename(generated_file) + "`")
+        st.write(f"**Generated file:** `{os.path.basename(generated_file)}`")
+        st.write(f"**Full path:** `{generated_file}`")
+        st.info("You can run this file with: `streamlit run " + os.path.basename(generated_file) + "`")
     
     if st.button("Start Over"):
         for key in ["page", "brand_data", "selected_logo", "selected_color", "logo_radio", "color_radio", "name", "generated_file"]:
             if key in st.session_state:
                 del st.session_state[key]
-        st.experimental_rerun()
+        st.rerun()
 
 if __name__ == "__main__":
     main()
