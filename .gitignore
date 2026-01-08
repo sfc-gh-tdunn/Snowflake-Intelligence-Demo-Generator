@@ -36,3 +36,5 @@ ENV/
 *.swp
 *.swo
 .DS_Store
+env-config.json
+React/public/env-config.json
