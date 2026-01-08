@@ -1,0 +1,70 @@
+spec:
+  containers:
+    - name: snowflake-demo-generator
+      image: /DEMO_GENERATOR/IMAGES/IMAGE_REPO/snowflake-demo-generator:latest
+      
+      # Resource allocation
+      resources:
+        requests:
+          memory: 512M
+          cpu: 0.5
+        limits:
+          memory: 1G
+          cpu: 1
+      
+      # Readiness probe
+      readinessProbe:
+        port: 8080
+        path: /health
+      
+      # Secrets - each becomes an environment variable with the same name
+      secrets:
+        - snowflakeSecret: DEMO_GENERATOR.ADMIN.BRANDFETCH_TOKEN
+          envVarName: BRANDFETCH_TOKEN
+        - snowflakeSecret: DEMO_GENERATOR.ADMIN.TDUNN_AUTH_TOKEN
+          envVarName: TDUNN_AUTH_TOKEN
+        - snowflakeSecret: DEMO_GENERATOR.ADMIN.SNOWHOUSE_AUTH_TOKEN
+          envVarName: SNOWHOUSE_AUTH_TOKEN
+        - snowflakeSecret: DEMO_GENERATOR.ADMIN.RAVEN_AGENT_ENDPOINT
+          envVarName: RAVEN_AGENT_ENDPOINT
+        - snowflakeSecret: DEMO_GENERATOR.ADMIN.API_ENDPOINT_RETAIL
+          envVarName: API_ENDPOINT_RETAIL
+        - snowflakeSecret: DEMO_GENERATOR.ADMIN.RETAIL_AUTH_TOKEN
+          envVarName: RETAIL_AUTH_TOKEN
+        - snowflakeSecret: DEMO_GENERATOR.ADMIN.API_ENDPOINT_ADS
+          envVarName: API_ENDPOINT_ADS
+        - snowflakeSecret: DEMO_GENERATOR.ADMIN.ADS_AUTH_TOKEN
+          envVarName: ADS_AUTH_TOKEN
+        - snowflakeSecret: DEMO_GENERATOR.ADMIN.API_ENDPOINT_FIN_INVESTMENT_PORTFOLIO_ANALYTICS
+          envVarName: API_ENDPOINT_FIN_INVESTMENT_PORTFOLIO_ANALYTICS
+        - snowflakeSecret: DEMO_GENERATOR.ADMIN.FIN_INVESTMENT_PORTFOLIO_ANALYTICS_AUTH_TOKEN
+          envVarName: FIN_INVESTMENT_PORTFOLIO_ANALYTICS_AUTH_TOKEN
+        - snowflakeSecret: DEMO_GENERATOR.ADMIN.API_ENDPOINT_FIN_ASSETS_MANAGEMENT_ADVISOR
+          envVarName: API_ENDPOINT_FIN_ASSETS_MANAGEMENT_ADVISOR
+        - snowflakeSecret: DEMO_GENERATOR.ADMIN.FIN_ASSETS_MANAGEMENT_ADVISOR_AUTH_TOKEN
+          envVarName: FIN_ASSETS_MANAGEMENT_ADVISOR_AUTH_TOKEN
+        - snowflakeSecret: DEMO_GENERATOR.ADMIN.API_ENDPOINT_FIN_CLAIMS_PROCESSOR
+          envVarName: API_ENDPOINT_FIN_CLAIMS_PROCESSOR
+        - snowflakeSecret: DEMO_GENERATOR.ADMIN.FIN_CLAIMS_PROCESSOR_AUTH_TOKEN
+          envVarName: FIN_CLAIMS_PROCESSOR_AUTH_TOKEN
+        - snowflakeSecret: DEMO_GENERATOR.ADMIN.API_ENDPOINT_HS_CLINICAL_TRIALS
+          envVarName: API_ENDPOINT_HS_CLINICAL_TRIALS
+        - snowflakeSecret: DEMO_GENERATOR.ADMIN.HS_CLINICAL_TRIALS_AUTH_TOKEN
+          envVarName: HS_CLINICAL_TRIALS_AUTH_TOKEN
+        - snowflakeSecret: DEMO_GENERATOR.ADMIN.API_ENDPOINT_HS_GENOMICS
+          envVarName: API_ENDPOINT_HS_GENOMICS
+        - snowflakeSecret: DEMO_GENERATOR.ADMIN.HS_GENOMICS_AUTH_TOKEN
+          envVarName: HS_GENOMICS_AUTH_TOKEN
+        - snowflakeSecret: DEMO_GENERATOR.ADMIN.API_ENDPOINT_MAN_PREDICTIVE_MAINTENANCE
+          envVarName: API_ENDPOINT_MAN_PREDICTIVE_MAINTENANCE
+        - snowflakeSecret: DEMO_GENERATOR.ADMIN.MAN_PREDICTIVE_MAINTENANCE_AUTH_TOKEN
+          envVarName: MAN_PREDICTIVE_MAINTENANCE_AUTH_TOKEN
+        - snowflakeSecret: DEMO_GENERATOR.ADMIN.API_ENDPOINT_MAN_SUPPLY_CHAIN_ASSISTANT
+          envVarName: API_ENDPOINT_MAN_SUPPLY_CHAIN_ASSISTANT
+        - snowflakeSecret: DEMO_GENERATOR.ADMIN.MAN_SUPPLY_CHAIN_ASSISTANT_AUTH_TOKEN
+          envVarName: MAN_SUPPLY_CHAIN_ASSISTANT_AUTH_TOKEN
+  
+  endpoints:
+    - name: app
+      port: 8080
+      public: true

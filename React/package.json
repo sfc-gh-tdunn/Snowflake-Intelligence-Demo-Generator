@@ -1,0 +1,43 @@
+{
+  "name": "snowflake-intelligence-demo-generator",
+  "version": "1.0.0",
+  "description": "Snowflake Intelligence Demo Generator - React Application",
+  "private": true,
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-scripts": "5.0.1",
+    "vega": "^5.25.0",
+    "vega-lite": "^5.16.0",
+    "vega-embed": "^6.22.0",
+    "@craco/craco": "^7.1.0"
+  },
+  "scripts": {
+    "start": "craco start",
+    "build": "craco build",
+    "test": "craco test",
+    "eject": "react-scripts eject",
+    "env": "node scripts/generate-env-config.js",
+    "prestart": "npm run env",
+    "prebuild": "npm run env"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}
+
