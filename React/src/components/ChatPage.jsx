@@ -110,7 +110,7 @@ const DEFAULT_QUESTIONS = {
   ]
 };
 
-function ChatPage({ logoUrl, brandColor, mainVertical, subVertical, discoveryQuestions, onStartOver }) {
+function ChatPage({ logoUrl, brandColor, mainVertical, subVertical, discoveryQuestions, customDataResult, onStartOver }) {
   const [chatHistory, setChatHistory] = useState([]);
   const [inputValue, setInputValue] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
@@ -119,7 +119,6 @@ function ChatPage({ logoUrl, brandColor, mainVertical, subVertical, discoveryQue
   const [currentThinking, setCurrentThinking] = useState('');
   const [currentStatus, setCurrentStatus] = useState('');
   const [error, setError] = useState('');
-  const [showQuestions, setShowQuestions] = useState(true);
   const [expandedThinking, setExpandedThinking] = useState({});
   const [copiedMessageId, setCopiedMessageId] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -128,6 +127,11 @@ function ChatPage({ logoUrl, brandColor, mainVertical, subVertical, discoveryQue
 
   // Get default questions based on vertical/subvertical
   const getDefaultQuestions = useCallback(() => {
+    // For Custom vertical, use the sample questions from agent creation
+    // The service returns sampleQuestions directly in the result
+    if (mainVertical === 'Custom' && customDataResult?.sampleQuestions?.length > 0) {
+      return customDataResult.sampleQuestions.slice(0, 3);
+    }
     // Try with subvertical first
     if (subVertical) {
       const key = `${mainVertical}|${subVertical}`;
@@ -141,7 +145,7 @@ function ChatPage({ logoUrl, brandColor, mainVertical, subVertical, discoveryQue
     }
     // Default fallback
     return [];
-  }, [mainVertical, subVertical]);
+  }, [mainVertical, subVertical, customDataResult]);
 
   const defaultQuestions = getDefaultQuestions();
 
@@ -236,6 +240,9 @@ function ChatPage({ logoUrl, brandColor, mainVertical, subVertical, discoveryQue
 
     setIsStreaming(true);
 
+    // Get custom agent URL if available (for Custom vertical)
+    const customAgentUrl = customDataResult?.agentUrl || null;
+
     try {
       let fullResponse = '';
       
@@ -250,7 +257,8 @@ function ChatPage({ logoUrl, brandColor, mainVertical, subVertical, discoveryQue
         },
         handleChartReceived,
         handleThinkingUpdate,
-        handleStatusUpdate
+        handleStatusUpdate,
+        customAgentUrl
       );
 
       setChatHistory([...newHistory, { 
@@ -343,43 +351,6 @@ function ChatPage({ logoUrl, brandColor, mainVertical, subVertical, discoveryQue
 
   return (
     <div className={`si-chat-page ${isDarkMode ? 'dark-mode' : 'light-mode'}`}>
-      {/* Sidebar for discovery questions */}
-      <aside className={`si-sidebar ${showQuestions ? 'open' : 'closed'}`}>
-        <button 
-          className="si-sidebar-toggle"
-          onClick={() => setShowQuestions(!showQuestions)}
-          aria-label={showQuestions ? 'Hide questions' : 'Show questions'}
-        >
-          <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor">
-            <path d={showQuestions 
-              ? "m10.146 13.354-5-5a.5.5 0 0 1 0-.708l5-5 .707.708L6.208 8l4.647 4.647z"
-              : "m5.854 13.354 5-5a.5.5 0 0 0 0-.708l-5-5-.707.708L9.792 8l-4.647 4.647z"
-            } />
-          </svg>
-        </button>
-        
-        {showQuestions && (
-          <div className="si-sidebar-content">
-            <h3 className="si-sidebar-title">Discovery Questions</h3>
-            {discoveryQuestions.length > 0 ? (
-              <ul className="si-sidebar-questions">
-                {discoveryQuestions.map((q, i) => (
-                  <li key={i} className="si-question-item">{q}</li>
-                ))}
-              </ul>
-            ) : (
-              <p className="si-no-questions">No questions available.</p>
-            )}
-            <button className="si-start-over" onClick={onStartOver}>
-              <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor">
-                <path d="M14 8a6 6 0 0 1-11.001 3.316v2.608h-1v-3.809a.5.5 0 0 1 .5-.5h3.809v1h-2.57A5 5 0 0 0 13 8zM8 1.999a6 6 0 0 1 5.001 2.686V2.076h1v3.809a.5.5 0 0 1-.5.5H9.692v-1h2.57A5.002 5.002 0 0 0 2.999 8h-1c0-3.314 2.687-6 6.001-6.001" />
-              </svg>
-              Start Over
-            </button>
-          </div>
-        )}
-      </aside>
-
       {/* Main chat content */}
       <main className="si-chat-main">
         {/* Header with brand color */}
@@ -403,25 +374,38 @@ function ChatPage({ logoUrl, brandColor, mainVertical, subVertical, discoveryQue
             )}
           </div>
           
-          {/* Dark/Light Mode Toggle */}
-          <button 
-            className="si-theme-toggle"
-            onClick={() => setIsDarkMode(!isDarkMode)}
-            aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-            title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-          >
-            {isDarkMode ? (
-              // Sun icon for light mode
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                <path d="M12 3a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0V4a1 1 0 0 1 1-1Zm0 15a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0v-1a1 1 0 0 1 1-1Zm9-6a1 1 0 0 1-1 1h-1a1 1 0 1 1 0-2h1a1 1 0 0 1 1 1ZM5 12a1 1 0 0 1-1 1H3a1 1 0 1 1 0-2h1a1 1 0 0 1 1 1Zm14.07-5.66a1 1 0 0 1 0 1.41l-.71.71a1 1 0 1 1-1.41-1.41l.71-.71a1 1 0 0 1 1.41 0ZM7.05 17.66a1 1 0 0 1 0 1.41l-.71.71a1 1 0 1 1-1.41-1.41l.71-.71a1 1 0 0 1 1.41 0Zm12.02.71a1 1 0 0 1-1.41 0l-.71-.71a1 1 0 1 1 1.41-1.41l.71.71a1 1 0 0 1 0 1.41ZM6.34 7.05a1 1 0 0 1-1.41 0l-.71-.71a1 1 0 0 1 1.41-1.41l.71.71a1 1 0 0 1 0 1.41ZM12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm0 2a2 2 0 1 1 0 4 2 2 0 0 1 0-4Z"/>
+          <div className="si-header-actions">
+            {/* Start Over Button */}
+            <button 
+              className="si-start-over-btn"
+              onClick={onStartOver}
+              title="Start Over"
+            >
+              <svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor">
+                <path d="M14 8a6 6 0 0 1-11.001 3.316v2.608h-1v-3.809a.5.5 0 0 1 .5-.5h3.809v1h-2.57A5 5 0 0 0 13 8zM8 1.999a6 6 0 0 1 5.001 2.686V2.076h1v3.809a.5.5 0 0 1-.5.5H9.692v-1h2.57A5.002 5.002 0 0 0 2.999 8h-1c0-3.314 2.687-6 6.001-6.001" />
               </svg>
-            ) : (
-              // Moon icon for dark mode
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                <path d="M12.1 22c-5.5 0-10-4.5-10-10 0-4.8 3.4-8.8 8-9.8.8-.2 1.4.6 1.1 1.4-.9 2.5-.2 5.4 1.9 7.4 2.1 2.1 5 2.8 7.4 1.9.7-.3 1.5.3 1.4 1.1-1 4.6-5 8-9.8 8Zm-6.9-9.8c.4 3.9 3.6 7 7.6 7.2 1.6.1 3.1-.3 4.4-1-2.3-.7-4.3-2.2-5.6-4.3-1.3-2.1-1.7-4.5-1.3-6.7-2.9 1-5 3.6-5.1 6.8Z"/>
-              </svg>
-            )}
-          </button>
+            </button>
+            
+            {/* Dark/Light Mode Toggle */}
+            <button 
+              className="si-theme-toggle"
+              onClick={() => setIsDarkMode(!isDarkMode)}
+              aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+              title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {isDarkMode ? (
+                // Sun icon for light mode
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                  <path d="M12 3a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0V4a1 1 0 0 1 1-1Zm0 15a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0v-1a1 1 0 0 1 1-1Zm9-6a1 1 0 0 1-1 1h-1a1 1 0 1 1 0-2h1a1 1 0 0 1 1 1ZM5 12a1 1 0 0 1-1 1H3a1 1 0 1 1 0-2h1a1 1 0 0 1 1 1Zm14.07-5.66a1 1 0 0 1 0 1.41l-.71.71a1 1 0 1 1-1.41-1.41l.71-.71a1 1 0 0 1 1.41 0ZM7.05 17.66a1 1 0 0 1 0 1.41l-.71.71a1 1 0 1 1-1.41-1.41l.71-.71a1 1 0 0 1 1.41 0Zm12.02.71a1 1 0 0 1-1.41 0l-.71-.71a1 1 0 1 1 1.41-1.41l.71.71a1 1 0 0 1 0 1.41ZM6.34 7.05a1 1 0 0 1-1.41 0l-.71-.71a1 1 0 0 1 1.41-1.41l.71.71a1 1 0 0 1 0 1.41ZM12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm0 2a2 2 0 1 1 0 4 2 2 0 0 1 0-4Z"/>
+                </svg>
+              ) : (
+                // Moon icon for dark mode
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                  <path d="M12.1 22c-5.5 0-10-4.5-10-10 0-4.8 3.4-8.8 8-9.8.8-.2 1.4.6 1.1 1.4-.9 2.5-.2 5.4 1.9 7.4 2.1 2.1 5 2.8 7.4 1.9.7-.3 1.5.3 1.4 1.1-1 4.6-5 8-9.8 8Zm-6.9-9.8c.4 3.9 3.6 7 7.6 7.2 1.6.1 3.1-.3 4.4-1-2.3-.7-4.3-2.2-5.6-4.3-1.3-2.1-1.7-4.5-1.3-6.7-2.9 1-5 3.6-5.1 6.8Z"/>
+                </svg>
+              )}
+            </button>
+          </div>
         </header>
 
         {/* Messages area */}

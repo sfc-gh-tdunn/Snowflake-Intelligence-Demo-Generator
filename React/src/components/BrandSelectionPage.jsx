@@ -1,30 +1,44 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 
-function BrandSelectionPage({ brandData, discoveryQuestions, onSelect, onBack }) {
+function BrandSelectionPage({ brandData, onSelect, onBack }) {
   const [selectedLogo, setSelectedLogo] = useState(brandData?.logos?.[0]?.src || '');
   const [selectedColor, setSelectedColor] = useState(brandData?.colors?.[0]?.hex || '#29b5e8');
-  
-  // Format questions as numbered text for editing
-  const formatQuestionsAsText = (questions) => {
-    if (!questions || questions.length === 0) {
-      return '1. \n2. \n3. \n4. \n5. ';
-    }
-    return questions.map((q, i) => `${i + 1}. ${q}`).join('\n');
-  };
-  
-  const [questionsText, setQuestionsText] = useState(formatQuestionsAsText(discoveryQuestions));
+  const [customLogoUrl, setCustomLogoUrl] = useState('');
+  const fileInputRef = useRef(null);
 
-  // Parse edited text back into array of questions
-  const parseQuestionsFromText = (text) => {
-    return text
-      .split('\n')
-      .map(line => line.replace(/^\d+\.\s*/, '').trim())
-      .filter(q => q.length > 0);
+  // Handle custom logo file upload
+  const handleLogoUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        alert('Please upload an image file');
+        return;
+      }
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Image must be less than 5MB');
+        return;
+      }
+      // Create a data URL for the uploaded image
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target.result;
+        setCustomLogoUrl(dataUrl);
+        setSelectedLogo(dataUrl);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Handle custom color input
+  const handleCustomColor = (e) => {
+    const color = e.target.value;
+    setSelectedColor(color);
   };
 
   const handleFinalize = () => {
-    const editedQuestions = parseQuestionsFromText(questionsText);
-    onSelect(selectedLogo, selectedColor, editedQuestions);
+    onSelect(selectedLogo, selectedColor);
   };
 
   return (
@@ -38,19 +52,6 @@ function BrandSelectionPage({ brandData, discoveryQuestions, onSelect, onBack })
         </div>
 
         <div className="brand-selection-content">
-          {/* Discovery Questions Column */}
-          <div className="discovery-questions-panel">
-            <h2>Top 5 Discovery Questions</h2>
-            <p className="questions-hint">Edit, reorder, or add questions below:</p>
-            <textarea
-              className="questions-textarea"
-              value={questionsText}
-              onChange={(e) => setQuestionsText(e.target.value)}
-              placeholder="1. First question&#10;2. Second question&#10;3. Third question&#10;4. Fourth question&#10;5. Fifth question"
-              rows={12}
-            />
-          </div>
-
           {/* Brand Selection Column */}
           <div className="brand-assets-panel">
             {/* Logo Selection */}
@@ -72,6 +73,37 @@ function BrandSelectionPage({ brandData, discoveryQuestions, onSelect, onBack })
               ) : (
                 <p className="no-logos">No logos found for this company.</p>
               )}
+              
+              {/* Custom Logo Upload */}
+              <div className="custom-upload-section">
+                <p className="upload-label">Or upload your own logo:</p>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleLogoUpload}
+                  accept="image/*"
+                  className="file-input-hidden"
+                  id="logo-upload"
+                />
+                <button 
+                  className="upload-button"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                    <path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+                  </svg>
+                  Upload Logo
+                </button>
+                {customLogoUrl && (
+                  <div 
+                    className={`logo-option custom-logo ${selectedLogo === customLogoUrl ? 'selected' : ''}`}
+                    onClick={() => setSelectedLogo(customLogoUrl)}
+                  >
+                    <img src={customLogoUrl} alt="Custom uploaded logo" />
+                    <span className="logo-type">Custom</span>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Color Selection */}
@@ -114,6 +146,32 @@ function BrandSelectionPage({ brandData, discoveryQuestions, onSelect, onBack })
                   </div>
                 </div>
               )}
+              
+              {/* Custom Color Picker */}
+              <div className="custom-color-section">
+                <p className="upload-label">Or choose your own color:</p>
+                <div className="color-picker-wrapper">
+                  <input
+                    type="color"
+                    value={selectedColor}
+                    onChange={handleCustomColor}
+                    className="color-picker-input"
+                    id="custom-color"
+                  />
+                  <label htmlFor="custom-color" className="color-picker-button">
+                    <div 
+                      className="color-preview-swatch"
+                      style={{ backgroundColor: selectedColor }}
+                    />
+                    <span className="color-picker-text">
+                      {selectedColor.toUpperCase()}
+                    </span>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                      <path d="M17.75 3c.966 0 1.75.784 1.75 1.75v14.5A1.75 1.75 0 0 1 17.75 21H6.25A1.75 1.75 0 0 1 4.5 19.25V4.75c0-.966.784-1.75 1.75-1.75h11.5zm0 1.5H6.25a.25.25 0 0 0-.25.25v14.5c0 .138.112.25.25.25h11.5a.25.25 0 0 0 .25-.25V4.75a.25.25 0 0 0-.25-.25zM12 6a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm0 1.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z"/>
+                    </svg>
+                  </label>
+                </div>
+              </div>
             </div>
 
             {/* Preview */}

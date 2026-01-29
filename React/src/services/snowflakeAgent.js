@@ -10,6 +10,7 @@ import { getEndpoint, getAuthToken } from '../config/endpoints';
  * @param {function} onChart - Callback for chart data: (chartSpec) => void
  * @param {function} onThinking - Callback for thinking updates: (thinking) => void
  * @param {function} onStatus - Callback for status updates: (status, message) => void
+ * @param {string} customAgentUrl - Optional custom agent URL (for Custom vertical)
  * @returns {Promise<{text: string, charts: Array, thinking: string}>} Complete response
  */
 export const streamChatResponse = async (
@@ -20,13 +21,15 @@ export const streamChatResponse = async (
   onChunk,
   onChart = null,
   onThinking = null,
-  onStatus = null
+  onStatus = null,
+  customAgentUrl = null
 ) => {
-  const endpoint = getEndpoint(mainVertical, subVertical);
-  const token = getAuthToken(mainVertical, subVertical);
+  const useCustomAgent = mainVertical === 'Custom' && customAgentUrl;
+  const endpoint = getEndpoint(mainVertical, subVertical, customAgentUrl);
+  const token = getAuthToken(mainVertical, subVertical, useCustomAgent);
 
   if (!endpoint) {
-    throw new Error(`No API endpoint configured for ${mainVertical}${subVertical ? ` / ${subVertical}` : ''}`);
+    throw new Error(`No API endpoint configured for ${mainVertical}${subVertical ? ` / ${subVertical}` : ''}. ${mainVertical === 'Custom' ? 'Custom agent may not have been created.' : ''}`);
   }
 
   if (!token) {
@@ -174,26 +177,8 @@ export const streamChatResponse = async (
               break;
               
             case 'response.tool_result':
-              // Tool results may contain charts
-              if (data.content && Array.isArray(data.content)) {
-                for (const item of data.content) {
-                  if (item.json && item.json.charts) {
-                    for (const chartSpecStr of item.json.charts) {
-                      try {
-                        const chartSpec = typeof chartSpecStr === 'string'
-                          ? JSON.parse(chartSpecStr)
-                          : chartSpecStr;
-                        charts.push(chartSpec);
-                        if (onChart) {
-                          onChart(chartSpec);
-                        }
-                      } catch (e) {
-                        console.error('Failed to parse chart from tool result:', e);
-                      }
-                    }
-                  }
-                }
-              }
+              // Tool results contain charts, but these are also emitted as response.chart events
+              // Skip processing here to avoid duplicates
               break;
               
             case 'response':

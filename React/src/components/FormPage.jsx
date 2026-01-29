@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { fetchBrandData } from '../services/brandfetch';
-import { fetchDiscoveryQuestions } from '../services/ravenAgent';
+import { generateCustomDemoData } from '../services/sqlStatement';
 import { MAIN_VERTICAL_OPTIONS, SUB_VERTICAL_OPTIONS } from '../config/endpoints';
 
 function FormPage({ onSubmit, initialData }) {
@@ -8,6 +8,7 @@ function FormPage({ onSubmit, initialData }) {
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [error, setError] = useState('');
+  const [fetchBrandAssets, setFetchBrandAssets] = useState(true);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -38,15 +39,44 @@ function FormPage({ onSubmit, initialData }) {
     setLoading(true);
 
     try {
-      // Fetch brand data
-      setLoadingMessage('Fetching brand data...');
-      const brandData = await fetchBrandData(formData.companyUrl);
+      // Fetch brand data (skip if checkbox unchecked)
+      let brandData = null;
+      if (fetchBrandAssets) {
+        setLoadingMessage('Fetching brand data...');
+        brandData = await fetchBrandData(formData.companyUrl);
+      } else {
+        // Use empty/default brand data when skipping
+        brandData = {
+          logos: [],
+          colors: [],
+          name: formData.companyUrl,
+        };
+      }
 
-      // Fetch discovery questions (in parallel would be better, but sequential for progress indication)
-      setLoadingMessage('Contacting Raven Agent (this may take up to 1 minute)...');
-      const questions = await fetchDiscoveryQuestions(formData.companyUrl);
+      // If Custom vertical, generate custom demo data (this includes the Raven call for table schemas)
+      let customDataResult = null;
+      let questions = [];
+      
+      if (formData.mainVertical === 'Custom') {
+        setLoadingMessage('Generating custom demo data (this may take a few minutes)...');
+        customDataResult = await generateCustomDemoData(
+          {
+            companyUrl: formData.companyUrl,
+            useCases: formData.useCases,
+            recordsPerTable: formData.recordsPerTable,
+          },
+          (status) => setLoadingMessage(status)
+        );
+        
+        // Use sample questions from the agent as discovery questions
+        questions = customDataResult.sampleQuestions || [];
+        
+        // Show success message briefly
+        setLoadingMessage(`✓ ${customDataResult.message}`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
 
-      onSubmit(formData, brandData, questions);
+      onSubmit(formData, brandData, questions, customDataResult);
     } catch (err) {
       setError(err.message || 'An error occurred. Please try again.');
     } finally {
@@ -101,7 +131,7 @@ function FormPage({ onSubmit, initialData }) {
           )}
 
           <div className="form-group">
-            <label htmlFor="name">Name *</label>
+            <label htmlFor="name">Rep Name *</label>
             <input
               type="text"
               id="name"
@@ -172,6 +202,19 @@ function FormPage({ onSubmit, initialData }) {
               min={1}
               disabled={loading}
             />
+          </div>
+
+          <div className="form-group checkbox-group">
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={fetchBrandAssets}
+                onChange={(e) => setFetchBrandAssets(e.target.checked)}
+                disabled={loading}
+              />
+              <span className="checkbox-text">Fetch brand assets (logos & colors)</span>
+              <span className="checkbox-hint">Uncheck to skip BrandFetch API call during testing</span>
+            </label>
           </div>
 
           <button type="submit" className="submit-button" disabled={loading}>

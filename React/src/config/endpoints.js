@@ -60,7 +60,12 @@ export const SUB_VERTICAL_TOKEN_MAP = {
 };
 
 // Get the appropriate endpoint for a vertical/sub-vertical combination
-export const getEndpoint = (mainVertical, subVertical) => {
+// customAgentUrl parameter allows overriding for Custom vertical
+export const getEndpoint = (mainVertical, subVertical, customAgentUrl = null) => {
+  // If custom agent URL is provided (for Custom vertical), use it
+  if (customAgentUrl) {
+    return customAgentUrl;
+  }
   // Try sub-vertical specific endpoint first
   if (subVertical && SUB_VERTICAL_ENDPOINT_MAP[mainVertical]?.[subVertical]) {
     return SUB_VERTICAL_ENDPOINT_MAP[mainVertical][subVertical]();
@@ -73,7 +78,12 @@ export const getEndpoint = (mainVertical, subVertical) => {
 };
 
 // Get the appropriate auth token for a vertical/sub-vertical combination
-export const getAuthToken = (mainVertical, subVertical) => {
+// For Custom vertical with custom agent, use SNOWHOUSE_AUTH_TOKEN
+export const getAuthToken = (mainVertical, subVertical, useCustomAgent = false) => {
+  // If using custom agent (Custom vertical), use the Snowhouse token
+  if (useCustomAgent || mainVertical === 'Custom') {
+    return getSnowHouseToken();
+  }
   // Try sub-vertical specific token first
   if (subVertical && SUB_VERTICAL_TOKEN_MAP[mainVertical]?.[subVertical]) {
     return SUB_VERTICAL_TOKEN_MAP[mainVertical][subVertical]();
@@ -89,6 +99,7 @@ export const getAuthToken = (mainVertical, subVertical) => {
 export const getBrandfetchToken = () => getEnv('BRANDFETCH_TOKEN');
 export const getSnowHouseToken = () => getEnv('SNOWHOUSE_AUTH_TOKEN');
 export const getRavenAgentEndpoint = () => getEnv('RAVEN_AGENT_ENDPOINT');
+export const getSqlStatementEndpoint = () => getEnv('API_ENDPOINT_SQL_STATEMENT');
 
 // Sub-vertical options for each main vertical
 export const SUB_VERTICAL_OPTIONS = {
@@ -97,9 +108,10 @@ export const SUB_VERTICAL_OPTIONS = {
   'Manufacturing': ['Supply Chain Assistant', 'Predictive Maintenance'],
 };
 
-// Main vertical options (excluding Custom for now)
+// Main vertical options
 export const MAIN_VERTICAL_OPTIONS = [
   'Advertising, Media & Entertainment',
+  'Custom',
   'Financial Services',
   'Health Services',
   'Manufacturing',

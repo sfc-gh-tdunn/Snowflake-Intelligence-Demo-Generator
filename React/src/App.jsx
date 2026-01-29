@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import FormPage from './components/FormPage';
 import BrandSelectionPage from './components/BrandSelectionPage';
 import ChatPage from './components/ChatPage';
+import { logDemoUsage } from './services/sqlStatement';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('form');
@@ -18,22 +19,28 @@ function App() {
   const [selectedLogo, setSelectedLogo] = useState('');
   const [selectedColor, setSelectedColor] = useState('#29b5e8');
   const [discoveryQuestions, setDiscoveryQuestions] = useState([]);
+  const [customDataResult, setCustomDataResult] = useState(null);
 
-  const handleFormSubmit = (data, brand, questions) => {
+  const handleFormSubmit = (data, brand, questions, customData = null) => {
     setFormData(data);
     setBrandData(brand);
     setDiscoveryQuestions(questions);
+    setCustomDataResult(customData);
     setCurrentPage('brand');
   };
 
-  const handleBrandSelect = (logo, color, editedQuestions) => {
+  const handleBrandSelect = (logo, color) => {
     setSelectedLogo(logo);
     setSelectedColor(color);
-    // Update discovery questions with any edits made by the user
-    if (editedQuestions) {
-      setDiscoveryQuestions(editedQuestions);
-    }
     setCurrentPage('chat');
+    
+    // Log demo usage to Snowflake (fire and forget - don't block navigation)
+    logDemoUsage({
+      name: formData.name,
+      companyUrl: formData.companyUrl,
+      vertical: formData.mainVertical,
+      subVertical: formData.subVertical,
+    });
   };
 
   const handleStartOver = () => {
@@ -51,6 +58,7 @@ function App() {
     setSelectedLogo('');
     setSelectedColor('#29b5e8');
     setDiscoveryQuestions([]);
+    setCustomDataResult(null);
   };
 
   return (
@@ -61,7 +69,6 @@ function App() {
       {currentPage === 'brand' && (
         <BrandSelectionPage
           brandData={brandData}
-          discoveryQuestions={discoveryQuestions}
           onSelect={handleBrandSelect}
           onBack={() => setCurrentPage('form')}
         />
@@ -73,6 +80,7 @@ function App() {
           mainVertical={formData.mainVertical}
           subVertical={formData.subVertical}
           discoveryQuestions={discoveryQuestions}
+          customDataResult={customDataResult}
           onStartOver={handleStartOver}
         />
       )}
